@@ -58,11 +58,6 @@ spec:
                 secretKeyRef:
                   name: mssecrets
                   key: API_VERSION
-          - name: CARTODB_USER
-            valueFrom:
-                secretKeyRef:
-                  name: mssecrets
-                  key: CARTODB_USER
 
         ports:
           - containerPort: 4100
