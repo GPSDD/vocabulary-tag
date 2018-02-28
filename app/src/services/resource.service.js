@@ -88,17 +88,8 @@ class ResourceService {
             id: { $in: resource.ids },
             type: resource.type
         };
-        if (resource.application) {
-            query['vocabularies.application'] = resource.application;
-        }
-        logger.debug('Getting resources with query' , query);
+        logger.debug('Getting resources with query', query);
         const resources = await Resource.find(query).exec();
-        if (resource.application) {
-            return resources.map(res => {
-                res.vocabularies = res.vocabularies.filter(voc => voc.application === resource.application);
-                return res;
-            }).filter(res => res.vocabularies.length > 0);
-        }
         return resources;
     }
 
