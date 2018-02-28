@@ -19,7 +19,7 @@ const koaBody = require('koa-body')({
 
 let dbOptions = {};
 // KUBE CLUSTER
-if (mongoUri.indexOf('replicaSet') > - 1) {
+if (mongoUri.indexOf('replicaSet') > -1) {
     dbOptions = {
         db: { native_parser: true },
         replset: {

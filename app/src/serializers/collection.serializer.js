@@ -8,8 +8,7 @@ class CollectionSerializer {
             attributes: {
                 name: el.name,
                 ownerId: el.ownerId,
-                application: el.application,
-                resources: el.resources ? el.resources.map(res => {
+                resources: el.resources ? el.resources.map((res) => {
                     return {
                         id: res.id,
                         type: res.type

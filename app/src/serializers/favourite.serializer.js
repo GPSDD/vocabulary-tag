@@ -10,8 +10,7 @@ class FavouriteSerializer {
                 resourceType: el.resourceType,
                 resourceId: el.resourceId,
                 createdAt: el.createdAt,
-                resource: el.resource,
-                application: el.application
+                resource: el.resource
             }
         };
     }

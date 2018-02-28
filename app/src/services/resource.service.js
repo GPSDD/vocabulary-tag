@@ -27,15 +27,13 @@ class ResourceService {
                     dataset,
                     id: resource.id,
                     type: resource.type,
-                    'vocabularies.id': vocabulary.name || { $ne: null },
-                    'vocabularies.application': vocabulary.application || { $ne: null }
+                    'vocabularies.id': vocabulary.name || { $ne: null }
                 } },
 
                 { $unwind: '$vocabularies' },
 
                 { $match: {
-                    'vocabularies.id': vocabulary.name || { $ne: null },
-                    'vocabularies.application': vocabulary.application || { $ne: null }
+                    'vocabularies.id': vocabulary.name || { $ne: null }
                 } },
 
                 { $group: {
@@ -107,13 +105,14 @@ class ResourceService {
     /*
     * @returns: hasPermission: <Boolean>
     */
-    static async hasPermission(user, dataset, pResource) {
+    static async hasPermission(application, user, dataset, pResource) {
         let permission = true;
         let resource;
         try {
             resource = await ctRegisterMicroservice.requestToMicroservice({
                 uri: `/${pResource.type}/${pResource.id}`,
                 method: 'GET',
+                application,
                 json: true
             });
         } catch (err) {
@@ -123,14 +122,6 @@ class ResourceService {
         if (!resource) {
             logger.error('Error getting resource from microservice');
             throw new ResourceNotFound(`REAL Resource ${pResource.type} - ${pResource.id} and dataset: ${dataset} doesn't exist`);
-        }
-        const appPermission = resource.application.find((resourceApp) => {
-            return user.extraUserData.apps.find((app) => {
-                return app === resourceApp;
-            });
-        });
-        if (!appPermission) {
-            permission = false;
         }
         if ((user.role === 'MANAGER') && (!resource.userId || resource.userId !== user.id)) {
             permission = false;

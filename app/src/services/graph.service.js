@@ -10,9 +10,9 @@ class GraphService {
                 uri: `/graph/${resource.type}/${resource.id}/associate`,
                 method: 'POST',
                 json: true,
+                application,
                 body: {
-                    tags,
-                    application
+                    tags
                 }
             });
         } catch (e) {

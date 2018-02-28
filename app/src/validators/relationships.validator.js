@@ -11,8 +11,7 @@ class RelationshipsValidator {
                 ctx.checkBody(key).check(function () {
                     if (this[key] instanceof Object && this[key].length === undefined) {
                         const matchTags = this[key].tags instanceof Array && this[key].tags.length > 0;
-                        const matchApplication = (typeof this[key].application === 'string') && this[key].application.length;
-                        if (matchTags && matchApplication) {
+                        if (matchTags) {
                             return true;
                         }
                         return false;

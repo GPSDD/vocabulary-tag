@@ -16,8 +16,7 @@ class VocabularySerializer {
                     type: 'vocabulary',
                     attributes: {
                         resources: el.resources,
-                        name: el.id,
-                        application: el.application
+                        name: el.id
                     }
                 });
             });
