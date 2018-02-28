@@ -29,7 +29,7 @@ class VocabularyRouter {
     }
 
     static getApplication(ctx) {
-        return JSON.parse(ctx.headers.app_key).application;
+        return 'data4sdgs';
     }
 
     static getResource(params) {
