@@ -8,8 +8,7 @@ class RelationshipValidator {
         logger.info('Validating Relationship Creation');
         ctx.checkBody('tags').notEmpty().check(function () {
             const matchTags = this.tags instanceof Array && this.tags.length > 0;
-            const matchApplication = (typeof this.application === 'string') && this.application.length > 0;
-            if (matchTags && matchApplication) {
+            if (matchTags) {
                 return true;
             }
             return false;

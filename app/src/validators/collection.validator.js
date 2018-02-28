@@ -4,13 +4,18 @@ const CollectionModel = require('models/collection.model');
 
 class CollectionValidator {
 
+    static getUser(ctx) {
+        return JSON.parse(ctx.headers.user_key) ? JSON.parse(ctx.headers.user_key) : { id: null };
+    }
+
+    static getApplication(ctx) {
+        return JSON.parse(ctx.headers.app_key).application;
+    }
+
     static async validate(ctx) {
         logger.info('Validating Collection Creation');
-
         ctx.checkBody('name').notEmpty();
-        ctx.checkBody('application').optional().toLow();
         ctx.checkBody('resources').optional().check((data) => {
-
             logger.debug('entering validation', data.resources);
             if (data.resources) {
                 for (let i = 0; i < data.resources.length; i++) {
@@ -28,17 +33,16 @@ class CollectionValidator {
         }
 
         // App validation
-        if (ctx.request.body.application) {
-            if (ctx.request.body.loggedUser.extraUserData.apps.indexOf(ctx.request.body.application) <= -1) {
-                ctx.throw(403, 'Forbidden');
-            }
-        } else {
-            ctx.request.body.application = 'rw';
+        const user = CollectionValidator.getUser(ctx);
+        const application = CollectionValidator.getApplication(ctx);
+        if (user.extraUserData.apps.indexOf(application) === -1) {
+            ctx.throw(403, 'Forbidden');
+            return;
         }
 
         const data = await CollectionModel.findOne({
             name: ctx.request.body.name,
-            application: ctx.request.body.application,
+            application,
             ownerId: ctx.request.body.loggedUser.id,
         });
         if (data) {

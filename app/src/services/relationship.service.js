@@ -12,16 +12,16 @@ class RelationshipService {
 
     static checkRelationship(resource, vocabulary) {
         return resource.vocabularies.find((elVocabulary) => {
-            return (vocabulary.id === elVocabulary.id) && (vocabulary.application === elVocabulary.application);
+            return (vocabulary.id === elVocabulary.id);
         });
     }
 
-    static async create(user, pVocabulary, dataset, pResource, body) {
+    static async create(application, user, pVocabulary, dataset, pResource) {
         logger.debug(`Checking entities`);
-        let vocabulary = await VocabularyService.getById(pVocabulary);
+        let vocabulary = await VocabularyService.getById(application, pVocabulary);
         if (!vocabulary || vocabulary.length === 0) {
             logger.debug(`This Vocabulary doesn't exist, let's create it`);
-            vocabulary = await VocabularyService.create(user, pVocabulary);
+            vocabulary = await VocabularyService.create(application, user, pVocabulary);
         }
         let resource = await ResourceService.get(dataset, pResource);
         if (!resource) {
@@ -33,14 +33,14 @@ class RelationshipService {
         if (relationship) {
             throw new RelationshipDuplicated(`This relationship already exists`);
         }
-        body.tags = Array.from(new Set(body.tags));
+        const tags = Array.from(new Set(pVocabulary.tags));
         try {
             logger.debug(`Relationship in vocabulary`);
             vocabulary.resources.push({
                 id: resource.id,
                 dataset: resource.dataset,
                 type: resource.type,
-                tags: body.tags
+                tags
             });
             vocabulary.save();
         } catch (err) {
@@ -49,28 +49,28 @@ class RelationshipService {
         logger.debug(`Relationship in resource`);
         resource.vocabularies.push({
             id: vocabulary.id,
-            application: vocabulary.application,
-            tags: body.tags
+            application,
+            tags
         });
         resource = await resource.save();
         // CREATE GRAPH ASSOCIATION
         if (vocabulary.id === 'knowledge_graph') {
             logger.info('Creating graph association');
-            await GraphService.associateTags(resource, body.tags, pVocabulary.application);
+            await GraphService.associateTags(resource, tags, application);
         }
         return resource;
     }
 
-    static async createSome(user, vocabularies, dataset, pResource) {
+    static async createSome(application, user, vocabularies, dataset, pResource) {
         for (let i = 0; i < vocabularies.length; i++) {
-            await RelationshipService.create(user, vocabularies[i], dataset, pResource, vocabularies[i]);
+            await RelationshipService.create(user, vocabularies[i], dataset, pResource);
         }
         return await ResourceService.get(dataset, pResource);
     }
 
-    static async delete(user, pVocabulary, dataset, pResource) {
+    static async delete(application, user, pVocabulary, dataset, pResource) {
         logger.debug(`Checking entities`);
-        const vocabulary = await VocabularyService.getById(pVocabulary);
+        const vocabulary = await VocabularyService.getById(application, pVocabulary);
         if (!vocabulary) {
             logger.debug(`This Vocabulary doesn't exist`);
             throw new VocabularyNotFound(`Vocabulary with name ${pVocabulary.name} doesn't exist`);
@@ -110,7 +110,7 @@ class RelationshipService {
         return await ResourceService.get(dataset, pResource);
     }
 
-    static async deleteAll(user, dataset, pResource) {
+    static async deleteAll(application, user, dataset, pResource) {
         const resource = await ResourceService.get(dataset, pResource);
         if (!resource || !resource.vocabularies || resource.vocabularies.length === 0) {
             logger.debug(`This resource doesn't have Relationships`);
@@ -118,7 +118,8 @@ class RelationshipService {
         }
         const vocabularies = resource.vocabularies.map((vocabulary) => {
             return {
-                name: vocabulary.id
+                name: vocabulary.id,
+                application
             };
         });
         for (let i = 0; i < vocabularies.length; i++) {
@@ -127,9 +128,9 @@ class RelationshipService {
         return await ResourceService.get(dataset, pResource);
     }
 
-    static async updateTagsFromRelationship(user, pVocabulary, dataset, pResource, body) {
+    static async updateTagsFromRelationship(application, user, pVocabulary, dataset, pResource) {
         logger.debug(`Checking entities`);
-        const vocabulary = await VocabularyService.getById(pVocabulary);
+        const vocabulary = await VocabularyService.getById(application, pVocabulary);
         if (!vocabulary) {
             logger.debug(`This Vocabulary doesn't exist`);
             throw new VocabularyNotFound(`Vocabulary with name ${pVocabulary.name} doesn't exist`);
@@ -153,7 +154,7 @@ class RelationshipService {
                 }
             }
             logger.debug(`Tags to vocabulary`);
-            vocabulary.resources[position].tags = body.tags;
+            vocabulary.resources[position].tags = pVocabulary.tags;
             vocabulary.save();
         } catch (err) {
             throw err;
@@ -166,22 +167,22 @@ class RelationshipService {
                 break;
             }
         }
-        resource.vocabularies[position].tags = body.tags;
+        resource.vocabularies[position].tags = vocabulary.tags;
         resource = await resource.save();
         // CREATE GRAPH ASSOCIATION
         if (vocabulary.id === 'knowledge_graph') {
             logger.info('Creating graph association');
-            await GraphService.associateTags(resource, body.tags, pVocabulary.application);
+            await GraphService.associateTags(resource, vocabulary.tags, pVocabulary.application);
         }
         return resource;
     }
 
-    static async concatTags(user, pVocabulary, dataset, pResource, body) {
+    static async concatTags(application, user, pVocabulary, dataset, pResource) {
         logger.debug(`Checking entities`);
-        let vocabulary = await VocabularyService.getById(pVocabulary);
+        let vocabulary = await VocabularyService.getById(application, pVocabulary);
         if (!vocabulary) {
             logger.debug(`This Vocabulary doesn't exist, let's create it`);
-            vocabulary = await VocabularyService.create(user, pVocabulary);
+            vocabulary = await VocabularyService.create(application, user, pVocabulary);
         }
         let resource = await ResourceService.get(dataset, pResource);
         if (!resource) {
@@ -191,7 +192,7 @@ class RelationshipService {
         logger.debug(`Checking if relationship doesn't exist yet`);
         const relationship = RelationshipService.checkRelationship(resource, vocabulary);
         if (!relationship) {
-            return await RelationshipService.create(user, pVocabulary, dataset, pResource, body);
+            return await RelationshipService.create(application, user, pVocabulary, dataset, pResource);
         }
         try {
             body.tags.forEach((el) => {
@@ -205,7 +206,7 @@ class RelationshipService {
         }
     }
 
-    static async cloneVocabularyTags(user, dataset, pResource, body) {
+    static async cloneVocabularyTags(application, user, dataset, pResource) {
         logger.debug(`Checking entities`);
         const resource = await ResourceService.get(dataset, pResource);
         if (!resource) {

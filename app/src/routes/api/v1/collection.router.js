@@ -11,12 +11,20 @@ const router = new Router({
 
 class CollectionRouter {
 
-    static async getAll(ctx) {
+    static getUser(ctx) {
+        return JSON.parse(ctx.headers.user_key) ? JSON.parse(ctx.headers.user_key) : { id: null };
+    }
 
+    static getApplication(ctx) {
+        return JSON.parse(ctx.headers.app_key).application;
+    }
+
+    static async getAll(ctx) {
         logger.info('Obtaining collection by user');
-        const application = ctx.query.application || ctx.query.app || 'rw';
+        const application = CollectionRouter.getApplication(ctx);
+        const user = CollectionRouter.getUser(ctx);
         const filters = {
-            ownerId: JSON.parse(ctx.query.loggedUser).id,
+            ownerId: user.id,
             application
         };
 
@@ -43,6 +51,7 @@ class CollectionRouter {
                     const datasetResources = await ctRegisterMicroservice.requestToMicroservice({
                         uri: `/dataset?ids=${datasets.join(',')}`,
                         method: 'GET',
+                        application,
                         json: true
                     });
                     for (let i = 0, length = datasetResources.data.length; i < length; i++) {
@@ -62,6 +71,7 @@ class CollectionRouter {
                     const widgetResources = await ctRegisterMicroservice.requestToMicroservice({
                         uri: `/widget?ids=${widgets.join(',')}`,
                         method: 'GET',
+                        application,
                         json: true
                     });
                     logger.info('Obtained', widgetResources);
@@ -85,6 +95,7 @@ class CollectionRouter {
                             const layerResource = await ctRegisterMicroservice.requestToMicroservice({
                                 uri: `/layer/${layers[i]}`,
                                 method: 'GET',
+                                application,
                                 json: true
                             });
                             for (let j = 0, lengthData = data.length; j < lengthData; j++) {
@@ -126,10 +137,12 @@ class CollectionRouter {
 
     static async postCollection(ctx) {
         logger.info('Creating collection with body ', ctx.request.body);
+        const application = CollectionRouter.getApplication(ctx);
+        const user = CollectionRouter.getUser(ctx);
         const body = {
             name: ctx.request.body.name,
-            application: ctx.request.body.application,
-            ownerId: ctx.request.body.loggedUser.id,
+            application,
+            ownerId: user.id,
             resources: ctx.request.body.resources || []
         };
         const data = await new CollectionModel(body).save();
@@ -168,14 +181,9 @@ class CollectionRouter {
 
 const existCollection = async (ctx, next) => {
     logger.debug('Checking if collection exists');
-    let loggedUser;
-    if (ctx.method === 'GET' || ctx.method === 'DELETE') {
-        loggedUser = JSON.parse(ctx.query.loggedUser);
-    } else {
-        loggedUser = ctx.request.body.loggedUser;
-    }
+    const user = CollectionRouter.getUser(ctx);
     const col = await CollectionModel.findById(ctx.params.id);
-    if (!col || ((loggedUser.id !== col.ownerId) && loggedUser.role !== 'ADMIN')) {
+    if (!col || ((user.id !== col.ownerId) && user.role !== 'ADMIN')) {
         ctx.throw(404, 'Collection not found');
         return;
     }

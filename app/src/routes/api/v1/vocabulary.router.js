@@ -17,13 +17,20 @@ const RelationshipNotValid = require('errors/relationship-not-valid.error');
 const CloneNotValid = require('errors/clone-not-valid.error');
 const RelationshipsNotValid = require('errors/relationships-not-valid.error');
 const RelationshipNotFound = require('errors/relationship-not-found.error');
-const ConsistencyViolation = require('errors/consistency-violation.error');
 const ResourceNotFound = require('errors/resource-not-found.error');
 const USER_ROLES = require('app.constants').USER_ROLES;
 
 const router = new Router();
 
 class VocabularyRouter {
+
+    static getUser(ctx) {
+        return JSON.parse(ctx.headers.user_key) ? JSON.parse(ctx.headers.user_key) : { id: null };
+    }
+
+    static getApplication(ctx) {
+        return JSON.parse(ctx.headers.app_key).application;
+    }
 
     static getResource(params) {
         let resource = { id: params.dataset, type: 'dataset' };
@@ -53,16 +60,18 @@ class VocabularyRouter {
         }
         logger.info(`Getting resources by vocabulary-tag`);
         const resource = {};
+        const application = VocabularyRouter.getApplication(ctx);
         resource.type = VocabularyRouter.getResourceTypeByPath(ctx.path);
-        const result = await VocabularyService.get(resource, query);
+        const result = await VocabularyService.get(application, resource, query);
         ctx.body = VocabularySerializer.serialize(result);
     }
 
     static async create(ctx) {
         logger.info(`Creating vocabulary with name: ${ctx.request.body.name}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await VocabularyService.create(user, ctx.request.body);
+            const user = VocabularyRouter.getUser(ctx);
+            const application = VocabularyRouter.getApplication(ctx);
+            const result = await VocabularyService.create(application, user, ctx.request.body);
             ctx.body = VocabularySerializer.serialize(result);
         } catch (err) {
             if (err instanceof VocabularyDuplicated) {
@@ -73,55 +82,20 @@ class VocabularyRouter {
         }
     }
 
-    // static async update(ctx) {
-    //     logger.info(`Updating vocabulary with name: ${ctx.request.body.name}`);
-    //     try {
-    //         const user = ctx.request.body.loggedUser;
-    //         const result = await VocabularyService.update(user, ctx.request.body);
-    //         ctx.body = VocabularySerializer.serialize(result);
-    //     } catch (err) {
-    //         if (err instanceof VocabularyNotFound) {
-    //             ctx.throw(400, err.message);
-    //             return;
-    //         } else if (err instanceof ConsistencyViolation) {
-    //             ctx.throw(409, err.message);
-    //             return;
-    //         }
-    //         throw err;
-    //     }
-    // }
-    //
-    // static async delete(ctx) {
-    //     logger.info(`Updating vocabulary with name: ${ctx.request.body.name}`);
-    //     try {
-    //         const user = ctx.request.body.loggedUser;
-    //         const result = await VocabularyService.delete(user, ctx.request.body);
-    //         ctx.body = VocabularySerializer.serialize(result);
-    //     } catch (err) {
-    //         if (err instanceof VocabularyNotFound) {
-    //             ctx.throw(400, err.message);
-    //             return;
-    //         } else if (err instanceof ConsistencyViolation) {
-    //             ctx.throw(400, err.message);
-    //             return;
-    //         }
-    //         throw err;
-    //     }
-    // }
-
     static async getAll(ctx) {
         logger.info('Getting all vocabularies');
         const filter = {};
         if (ctx.query.limit) { filter.limit = ctx.query.limit; }
-        const result = await VocabularyService.getAll(filter);
+        const application = VocabularyRouter.getApplication(ctx);
+        const result = await VocabularyService.getAll(application, filter);
         ctx.body = VocabularySerializer.serialize(result);
     }
 
     static async getById(ctx) {
         logger.info(`Getting vocabulary by name: ${ctx.params.vocabulary}`);
-        const application = ctx.query.application || ctx.query.app || 'rw';
-        const vocabulary = { name: ctx.params.vocabulary, application };
-        const result = await VocabularyService.getById(vocabulary);
+        const application = VocabularyRouter.getApplication(ctx);
+        const vocabulary = { name: ctx.params.vocabulary };
+        const result = await VocabularyService.getById(application, vocabulary);
         ctx.body = VocabularySerializer.serialize(result);
     }
 
@@ -129,9 +103,9 @@ class VocabularyRouter {
     static async getByResource(ctx) {
         const resource = VocabularyRouter.getResource(ctx.params);
         logger.info(`Getting vocabularies of ${resource.type}: ${resource.id}`);
-        const application = ctx.query.application || ctx.query.app || 'rw';
-        const vocabulary = { name: ctx.params.vocabulary, application };
-        const result = await ResourceService.get(ctx.params.dataset, resource, vocabulary);
+        const dataset = ctx.params.dataset;
+        const vocabulary = { name: ctx.params.vocabulary };
+        const result = await ResourceService.get(dataset, resource, vocabulary);
         ctx.body = ResourceSerializer.serialize(result);
     }
 
@@ -142,11 +116,9 @@ class VocabularyRouter {
         }
         logger.info(`Getting vocabularies by ids: ${ctx.request.body.ids}`);
         const resource = {
-            ids: ctx.request.body.ids
+            ids: ctx.request.body.ids,
+            application: VocabularyRouter.getApplication(ctx)
         };
-        if (ctx.query.application) {
-            resource.application = ctx.query.application;
-        }
         if (typeof resource.ids === 'string') {
             resource.ids = resource.ids.split(',').map(elem => elem.trim());
         }
@@ -157,14 +129,13 @@ class VocabularyRouter {
 
     static async createRelationship(ctx) {
         const dataset = ctx.params.dataset;
-        const application = ctx.request.body.application || 'rw';
-        const vocabulary = { name: ctx.params.vocabulary, application };
+        const application = VocabularyRouter.getApplication(ctx);
+        const vocabulary = { name: ctx.params.vocabulary, tags: ctx.request.body.tags };
         const resource = VocabularyRouter.getResource(ctx.params);
-        const body = ctx.request.body;
         logger.info(`Creating realtionship between vocabulary: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.create(user, vocabulary, dataset, resource, body);
+            const user = VocabularyRouter.getUser(ctx);
+            const result = await RelationshipService.create(application, user, vocabulary, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof RelationshipDuplicated) {
@@ -176,6 +147,7 @@ class VocabularyRouter {
     }
 
     static async createRelationships(ctx) {
+        const application = VocabularyRouter.getApplication(ctx);
         const dataset = ctx.params.dataset;
         const resource = VocabularyRouter.getResource(ctx.params);
         const body = ctx.request.body;
@@ -184,7 +156,7 @@ class VocabularyRouter {
             if (key !== 'loggedUser') {
                 vocabularies.push({
                     name: key,
-                    application: body[key].application,
+                    application,
                     tags: body[key].tags
                 });
             }
@@ -193,8 +165,8 @@ class VocabularyRouter {
             logger.info(`Creating realtionships between vocabulary: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
         });
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.createSome(user, vocabularies, dataset, resource);
+            const user = VocabularyRouter.getUser(ctx);
+            const result = await RelationshipService.createSome(application, user, vocabularies, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof RelationshipDuplicated) {
@@ -206,13 +178,13 @@ class VocabularyRouter {
     }
 
     static async updateRelationships(ctx) {
+        const application = VocabularyRouter.getApplication(ctx);
+        const user = VocabularyRouter.getUser(ctx);
         const dataset = ctx.params.dataset;
         const resource = VocabularyRouter.getResource(ctx.params);
-        const body = ctx.request.body;
         logger.info(`Deleting All Vocabularies of resource: ${resource.type} - ${resource.id}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.deleteAll(user, dataset, resource);
+            const result = await RelationshipService.deleteAll(application, user, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof VocabularyNotFound || err instanceof ResourceNotFound) {
@@ -224,12 +196,13 @@ class VocabularyRouter {
                 throw err;
             }
         }
+        const body = ctx.request.body;
         const vocabularies = [];
         Object.keys(body).forEach((key) => {
             if (key !== 'loggedUser') {
                 vocabularies.push({
                     name: key,
-                    application: body[key].application,
+                    application,
                     tags: body[key].tags
                 });
             }
@@ -238,8 +211,7 @@ class VocabularyRouter {
             logger.info(`Creating realtionships between vocabulary: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
         });
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.createSome(user, vocabularies, dataset, resource);
+            const result = await RelationshipService.createSome(application, user, vocabularies, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof RelationshipDuplicated) {
@@ -251,14 +223,14 @@ class VocabularyRouter {
     }
 
     static async deleteRelationship(ctx) {
+        const application = VocabularyRouter.getApplication(ctx);
+        const user = VocabularyRouter.getUser(ctx);
         const dataset = ctx.params.dataset;
-        const application = ctx.query.application || ctx.query.app || 'rw';
-        const vocabulary = { name: ctx.params.vocabulary, application };
+        const vocabulary = { name: ctx.params.vocabulary };
         const resource = VocabularyRouter.getResource(ctx.params);
         logger.info(`Deleting Relationship between: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.delete(user, vocabulary, dataset, resource);
+            const result = await RelationshipService.delete(application, user, vocabulary, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof VocabularyNotFound || err instanceof ResourceNotFound || err instanceof RelationshipNotFound) {
@@ -270,12 +242,13 @@ class VocabularyRouter {
     }
 
     static async deleteRelationships(ctx) {
+        const application = VocabularyRouter.getApplication(ctx);
+        const user = VocabularyRouter.getUser(ctx);
         const dataset = ctx.params.dataset;
         const resource = VocabularyRouter.getResource(ctx.params);
         logger.info(`Deleting All Vocabularies of resource: ${resource.type} - ${resource.id}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.deleteAll(user, dataset, resource);
+            const result = await RelationshipService.deleteAll(application, user, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof VocabularyNotFound || err instanceof ResourceNotFound || err instanceof RelationshipNotFound) {
@@ -288,14 +261,13 @@ class VocabularyRouter {
 
     static async updateRelationshipTags(ctx) {
         const dataset = ctx.params.dataset;
-        const application = ctx.request.body.application || 'rw';
-        const vocabulary = { name: ctx.params.vocabulary, application };
+        const user = VocabularyRouter.getUser(ctx);
+        const application = VocabularyRouter.getApplication(ctx);
+        const vocabulary = { name: ctx.params.vocabulary, tags: ctx.request.body.tags };
         const resource = VocabularyRouter.getResource(ctx.params);
-        const body = ctx.request.body;
         logger.info(`Updating tags of relationship: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.updateTagsFromRelationship(user, vocabulary, dataset, resource, body);
+            const result = await RelationshipService.updateTagsFromRelationship(application, user, vocabulary, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof VocabularyNotFound || err instanceof ResourceNotFound || err instanceof RelationshipNotFound) {
@@ -308,14 +280,13 @@ class VocabularyRouter {
 
     static async concatTags(ctx) {
         const dataset = ctx.params.dataset;
-        const application = ctx.request.body.application || 'rw';
-        const vocabulary = { name: ctx.params.vocabulary, application };
+        const application = VocabularyRouter.getApplication(ctx);
+        const user = VocabularyRouter.getUser(ctx);
+        const vocabulary = { name: ctx.params.vocabulary, tags: ctx.request.body.tags };
         const resource = VocabularyRouter.getResource(ctx.params);
-        const body = ctx.request.body;
         logger.info(`Conacatenating more tags in relationship: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.concatTags(user, vocabulary, dataset, resource, body);
+            const result = await RelationshipService.concatTags(application, user, vocabulary, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof VocabularyNotFound || err instanceof ResourceNotFound || err instanceof RelationshipNotFound) {
@@ -328,13 +299,14 @@ class VocabularyRouter {
 
     static async cloneVocabularyTags(ctx) {
         const dataset = ctx.params.dataset;
+        const application = VocabularyRouter.getApplication(ctx);
+        const user = VocabularyRouter.getUser(ctx);
         const resource = VocabularyRouter.getResource(ctx.params);
         const body = ctx.request.body;
         const newDataset = body.newDataset;
         logger.info(`Cloning relationships: of resource ${resource.type} - ${resource.id} in ${newDataset}`);
         try {
-            const user = ctx.request.body.loggedUser;
-            const result = await RelationshipService.cloneVocabularyTags(user, dataset, resource, body);
+            const result = await RelationshipService.cloneVocabularyTags(application, user, dataset, resource);
             ctx.body = ResourceSerializer.serialize(result);
         } catch (err) {
             if (err instanceof VocabularyNotFound || err instanceof ResourceNotFound || err instanceof RelationshipNotFound) {
@@ -350,7 +322,9 @@ class VocabularyRouter {
 // Negative checking
 const relationshipAuthorizationMiddleware = async (ctx, next) => {
     // Get user from query (delete) or body (post-patch)
-    const user = Object.assign({}, ctx.request.query.loggedUser ? JSON.parse(ctx.request.query.loggedUser) : {}, ctx.request.body.loggedUser);
+    const dataset = ctx.params.dataset;
+    const application = VocabularyRouter.getApplication(ctx);
+    const user = VocabularyRouter.getUser(ctx);
     if (user.id === 'microservice') {
         await next();
         return;
@@ -366,13 +340,14 @@ const relationshipAuthorizationMiddleware = async (ctx, next) => {
     if (user.role === 'MANAGER' || user.role === 'ADMIN') {
         const resource = VocabularyRouter.getResource(ctx.params);
         try {
-            const permission = await ResourceService.hasPermission(user, ctx.params.dataset, resource);
+            const permission = await ResourceService.hasPermission(application, user, dataset, resource);
             if (!permission) {
                 ctx.throw(403, 'Forbidden');
                 return;
             }
         } catch (err) {
-            throw err;
+            ctx.throw(403, 'Forbidden');
+            return;
         }
     }
     await next(); // SUPERADMIN are included here
@@ -381,7 +356,7 @@ const relationshipAuthorizationMiddleware = async (ctx, next) => {
 // Negative checking
 const vocabularyAuthorizationMiddleware = async (ctx, next) => {
     // Get user from query (delete) or body (post-patch)
-    const user = Object.assign({}, ctx.request.query.loggedUser ? JSON.parse(ctx.request.query.loggedUser) : {}, ctx.request.body.loggedUser);
+    const user = VocabularyRouter.getUser(ctx);
     if (user.id === 'microservice') {
         await next();
         return;
@@ -494,8 +469,6 @@ router.delete('/dataset/:dataset/layer/:layer/vocabulary', relationshipAuthoriza
 router.get('/vocabulary', VocabularyRouter.getAll);
 router.get('/vocabulary/:vocabulary', VocabularyRouter.getById);
 router.post('/vocabulary', vocabularyValidationMiddleware, vocabularyAuthorizationMiddleware, VocabularyRouter.create);
-// router.patch('/vocabulary/:vocabulary', vocabularyValidationMiddleware, vocabularyAuthorizationMiddleware, VocabularyRouter.update);
-// router.delete('/vocabulary/:vocabulary', vocabularyAuthorizationMiddleware, VocabularyRouter.delete);
 
 // get by ids (to include queries)
 router.post('/dataset/vocabulary/get-by-ids', VocabularyRouter.getByIds);

@@ -1,11 +1,7 @@
 
 const logger = require('logger');
 const Vocabulary = require('models/vocabulary.model');
-const ResourceService = require('services/resource.service');
-const VocabularyNotFound = require('errors/vocabulary-not-found.error');
 const VocabularyDuplicated = require('errors/vocabulary-duplicated.error');
-const ResourceUpdateFailed = require('errors/resource-update-failed.error');
-const ConsistencyViolation = require('errors/consistency-violation.error');
 
 class VocabularyService {
 
@@ -18,9 +14,8 @@ class VocabularyService {
         return query;
     }
 
-    static async get(resource, pQuery) {
+    static async get(application, resource, pQuery) {
         logger.debug(`Getting resources by vocabulary-tag`);
-        const application = pQuery.application || pQuery.app;
         const query = VocabularyService.getQuery(pQuery);
         let vocabularies = Object.keys(query).map((vocabularyName) => {
             return Vocabulary.aggregate([
@@ -97,85 +92,36 @@ class VocabularyService {
         return vocabularies;
     }
 
-    static async create(user, pVocabulary) {
+    static async create(application, user, pVocabulary) {
         logger.debug('Checking if vocabulary already exists');
         let vocabulary = await Vocabulary.findOne({
             id: pVocabulary.name,
-            application: pVocabulary.application
+            application
         }).exec();
         if (vocabulary) {
             logger.error('Error creating vocabulary');
-            throw new VocabularyDuplicated(`Vocabulary of with name: ${pVocabulary.name}: already exists and ${pVocabulary.application}`);
+            throw new VocabularyDuplicated(`Vocabulary of with name: ${pVocabulary.name}: already exists and ${application}`);
         }
         logger.debug('Creating vocabulary');
         vocabulary = new Vocabulary({
             id: pVocabulary.name,
-            application: pVocabulary.application
+            application
         });
         return vocabulary.save();
     }
 
-    // static async update(pVocabulary) {
-    //     logger.debug('Checking if vocabulary doesnt exist');
-    //     const vocabulary = await Vocabulary.findOne({
-    //         id: pVocabulary.name,
-    //         application: pVocabulary.application
-    //     }).exec();
-    //     if (!vocabulary) {
-    //         logger.error('Error updating vocabulary');
-    //         throw new VocabularyNotFound(`Vocabulary with name: ${pVocabulary.name} doesn't exist and ${pVocabulary.application}`);
-    //     }
-    //     vocabulary.name = pVocabulary.name ? pVocabulary.name : vocabulary.name;
-    //     vocabulary.application = pVocabulary.application ? pVocabulary.application : vocabulary.application;
-    //     vocabulary.updatedAt = new Date();
-    //     logger.debug('Updating resources');
-    //     try {
-    //         await ResourceService.updateVocabulary(vocabulary);
-    //     } catch (err) {
-    //         if (err instanceof ResourceUpdateFailed) {
-    //             throw new ConsistencyViolation(`Consistency Violation: References cannot be updated`);
-    //         }
-    //     }
-    //     logger.debug('Updating vocabulary');
-    //     return vocabulary.save();
-    // }
-    //
-    // static async delete(pVocabulary) {
-    //     logger.debug('Checking if vocabulary doesnt exists');
-    //     const query = {
-    //         id: pVocabulary.name,
-    //         application: pVocabulary.application
-    //     };
-    //     const vocabulary = await Vocabulary.findOne(query).exec();
-    //     if (!vocabulary) {
-    //         logger.error('Error deleting vocabulary');
-    //         throw new VocabularyNotFound(`Vocabulary with name: ${pVocabulary.name} doesn't exist and ${pVocabulary.application}`);
-    //     }
-    //     logger.debug('Updating resources');
-    //     try {
-    //         await ResourceService.deleteVocabulary(vocabulary);
-    //     } catch (err) {
-    //         if (err instanceof ResourceUpdateFailed) {
-    //             throw new ConsistencyViolation(`Consistency Violation: References cannot be deleted`);
-    //         }
-    //     }
-    //     logger.debug('Deleting vocabulary');
-    //     await Vocabulary.remove(query).exec();
-    //     return vocabulary;
-    // }
-
-    static async getAll(filter) {
+    static async getAll(application, filter) {
         const limit = (isNaN(parseInt(filter.limit, 10))) ? 0 : parseInt(filter.limit, 10);
         logger.debug('Getting vocabularies');
-        const vocabularies = await Vocabulary.find({}).limit(limit).exec();
+        const vocabularies = await Vocabulary.find({ application }).limit(limit).exec();
         return vocabularies;
     }
 
-    static async getById(pVocabulary) {
-        logger.debug(`Getting vocabulary with id ${pVocabulary.name} and application ${pVocabulary.application}`);
+    static async getById(application, pVocabulary) {
+        logger.debug(`Getting vocabulary with id ${pVocabulary.name} and application ${application}`);
         const query = {
             id: pVocabulary.name,
-            application: pVocabulary.application ? pVocabulary.application : { $ne: null }
+            application
         };
         logger.debug('Getting vocabulary');
         const vocabulary = await Vocabulary.find(query).exec();
