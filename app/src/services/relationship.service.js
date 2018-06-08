@@ -63,7 +63,7 @@ class RelationshipService {
 
     static async createSome(application, user, vocabularies, dataset, pResource) {
         for (let i = 0; i < vocabularies.length; i++) {
-            await RelationshipService.create(user, vocabularies[i], dataset, pResource);
+            await RelationshipService.create(application, user, vocabularies[i], dataset, pResource);
         }
         return await ResourceService.get(dataset, pResource);
     }
