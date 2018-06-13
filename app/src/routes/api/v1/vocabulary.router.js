@@ -162,7 +162,7 @@ class VocabularyRouter {
             }
         });
         vocabularies.forEach((vocabulary) => {
-            logger.info(`Creating realtionships between vocabulary: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
+            logger.info(`Creating relationships between vocabulary: ${vocabulary.name} and resource: ${resource.type} - ${resource.id}`);
         });
         try {
             const user = VocabularyRouter.getUser(ctx);
@@ -465,7 +465,7 @@ router.patch('/dataset/:dataset/layer/:layer/vocabulary/:vocabulary', relationsh
 router.delete('/dataset/:dataset/layer/:layer/vocabulary/:vocabulary', relationshipAuthorizationMiddleware, VocabularyRouter.deleteRelationship);
 router.delete('/dataset/:dataset/layer/:layer/vocabulary', relationshipAuthorizationMiddleware, VocabularyRouter.deleteRelationships);
 
-// vocabulary (not the commmon use case)
+// vocabulary (not the common use case)
 router.get('/vocabulary', VocabularyRouter.getAll);
 router.get('/vocabulary/:vocabulary', VocabularyRouter.getById);
 router.post('/vocabulary', vocabularyValidationMiddleware, vocabularyAuthorizationMiddleware, VocabularyRouter.create);
