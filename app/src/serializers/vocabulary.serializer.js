@@ -24,6 +24,28 @@ class VocabularySerializer {
         return result;
     }
 
+
+    static serializeTags(data) {
+
+        const result = {};
+
+        if (data) {
+            if (!Array.isArray(data)) {
+                data = [data];
+            }
+            data.forEach((el) => {
+                el.resources.forEach((resource) => {
+                    resource.tags.forEach((tag) => {
+                        result[tag] = tag;
+                    });
+                });
+            });
+        }
+        return {
+            data: Object.values(result)
+        };
+    }
+
 }
 
 module.exports = VocabularySerializer;
