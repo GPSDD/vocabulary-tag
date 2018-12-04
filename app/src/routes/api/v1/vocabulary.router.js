@@ -344,7 +344,7 @@ const relationshipAuthorizationMiddleware = async (ctx, next) => {
     // if (user.role === 'USER') {
     //     ctx.throw(403, 'Forbidden'); // if USER -> out
     //     return;
-    }
+    //}
     if (user.role === 'MANAGER' || user.role === 'ADMIN' || user.role === 'USER') {
         const resource = VocabularyRouter.getResource(ctx.params);
         try {
