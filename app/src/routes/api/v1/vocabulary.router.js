@@ -377,11 +377,11 @@ const vocabularyAuthorizationMiddleware = async (ctx, next) => {
         return;
     }
     //any user can post, not all can patch/delete
-    if (ctx.request.method === 'POST' && (user.role === 'ADMIN' || user.role === 'MANAGER' && user.role === 'USER')) {
+    if (ctx.request.method === 'POST' && (user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'USER')) {
         await next();
         return;
     }
-    if (ctx.request.method !== 'POST' && (user.role === 'ADMIN' || user.role === 'MANAGER' && user.role === 'USER')) {
+    if (ctx.request.method !== 'POST' && (user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'USER')) {
         const resource = VocabularyRouter.getResource(ctx.params);
         try {
             const permission = await ResourceService.hasPermission(application, user, dataset, resource);
