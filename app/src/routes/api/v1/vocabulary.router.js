@@ -341,11 +341,11 @@ const relationshipAuthorizationMiddleware = async (ctx, next) => {
         ctx.throw(401, 'Unauthorized'); // if not logged or invalid ROLE-> out
         return;
     }
-    if (user.role === 'USER') {
-        ctx.throw(403, 'Forbidden'); // if USER -> out
-        return;
+    // if (user.role === 'USER') {
+    //     ctx.throw(403, 'Forbidden'); // if USER -> out
+    //     return;
     }
-    if (user.role === 'MANAGER' || user.role === 'ADMIN') {
+    if (user.role === 'MANAGER' || user.role === 'ADMIN' || user.role === 'USER') {
         const resource = VocabularyRouter.getResource(ctx.params);
         try {
             const permission = await ResourceService.hasPermission(application, user, dataset, resource);
@@ -365,6 +365,9 @@ const relationshipAuthorizationMiddleware = async (ctx, next) => {
 const vocabularyAuthorizationMiddleware = async (ctx, next) => {
     // Get user from query (delete) or body (post-patch)
     const user = VocabularyRouter.getUser(ctx);
+    const dataset = ctx.params.dataset;
+    const application = VocabularyRouter.getApplication(ctx);
+
     if (user.id === 'microservice') {
         await next();
         return;
@@ -373,7 +376,23 @@ const vocabularyAuthorizationMiddleware = async (ctx, next) => {
         ctx.throw(401, 'Unauthorized'); // if not logged or invalid ROLE -> out
         return;
     }
-    if (ctx.request.method === 'POST' && user.role === 'ADMIN') {
+    //any user can post, not all can patch/delete
+    if (ctx.request.method === 'POST' && (user.role === 'ADMIN' || user.role === 'MANAGER' && user.role === 'USER')) {
+        await next();
+        return;
+    }
+    if (ctx.request.method !== 'POST' && (user.role === 'ADMIN' || user.role === 'MANAGER' && user.role === 'USER')) {
+        const resource = VocabularyRouter.getResource(ctx.params);
+        try {
+            const permission = await ResourceService.hasPermission(application, user, dataset, resource);
+            if (!permission) {
+                ctx.throw(403, 'Forbidden');
+                return;
+            }
+        } catch (err) {
+            ctx.throw(403, 'Forbidden');
+            return;
+        }
         await next();
         return;
     }
